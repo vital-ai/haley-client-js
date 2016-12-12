@@ -733,6 +733,14 @@ HaleyAPIVitalServiceImpl.prototype.sendMessage = function(haleySession, aimpMess
 		aimpMessage.URI = this._randomURI();
 	}
 	
+	if(aimpMessage.get('channelURI') == null && haleySession.defaultChannelURI != null) {
+		aimpMessage.set('channelURI', haleySession.defaultChannelURI);
+	}
+	
+	if(aimpMessage.get('endpointURI') == null && haleySession.defaultEndpointURI != null ) {
+		aimpMessage.set('endpointURI', haleySession.defaultEndpointURI);
+	}
+	
 	var sessionID = haleySession.getSessionID();
 
 	var authAccount = haleySession.getAuthAccount();
@@ -753,6 +761,18 @@ HaleyAPIVitalServiceImpl.prototype.sendMessage = function(haleySession, aimpMess
 		
 		var n = authAccount.get('name');
 		aimpMessage.set('userName', n != null ? n : authAccount.get('username'));
+		
+	} else {
+		
+		
+		if(aimpMessage.get('userID') == null && haleySession.defaultUserID != null) {
+			aimpMessage.set('userID', haleySession.defaultUserID);
+		}
+		
+		if(aimpMessage.get('userName') == null && haleySession.defaultUserName != null) {
+			aimpMessage.set('userName', haleySession.defaultUserName);
+		}
+	
 		
 	}
 	
@@ -780,7 +800,12 @@ HaleyAPIVitalServiceImpl.prototype.sendMessage = function(haleySession, aimpMess
 		}
 	}
 	
-	this.vitalService.callFunction('haley-send-message', {message: rl}, function(successRL){
+//	this.vi
+	var currentLogin = this.vitalService.getCurrentLogin();
+	
+	var method = currentLogin != null ? 'haley-send-message' : 'haley-send-message-anonymous';
+	
+	this.vitalService.callFunction(method, {message: rl}, function(successRL){
 		
 		console.log("message sent successfully", successRL);
 		
@@ -857,3 +882,21 @@ HaleyAPIVitalServiceImpl.prototype.unauthenticateSession = function(haleySession
 //uploadBinary(HaleySession, Channel, HaleyCallback)
 
 
+if(typeof(module) !== 'undefined') {
+
+//	if(typeof(VitalService) === 'undefined') {
+
+		//VitalService = require(__dirname + '/../vitalservice-js/vitalservice-0.2.304.js');
+		
+//	}
+	
+//	if(typeof(VitalServiceWebsocketImpl) === 'undefined') {
+		
+		//VitalServiceWebsocketImpl = require(__dirname + '/../vitalservice-js/vitalservice-0.2.304.js');
+		
+//	}
+	
+	
+	module.exports = HaleyAPIVitalServiceImpl;
+	
+}

@@ -6,6 +6,14 @@
 HaleySession = function(implementation){
 	//haley session maintains its state
 	this.impl = implementation;
+	//default channel URI for output messages
+	this.defaultChannelURI = null;
+	//default endpoint URI for output messages
+	this.defaultEndpointURI = null;
+	//default userID for output messages
+	this.defaultUserID = null;
+	//default userName for output messages
+	this.defaultUserName = null;
 }
 
 HaleySession.prototype.isAuthenticated = function() {
@@ -26,6 +34,8 @@ HaleySession.prototype.getSessionID = function() {
 HaleySession.prototype.getAuthAccount = function() {
 	return this.impl.getAuthAccount(this);
 }
+
+
 
 /**
  * 
@@ -200,3 +210,12 @@ HaleyAPI.prototype.unauthenticateSession = function(haleySession, callback) {
 
 //uploadBinary(HaleySession, Channel)
 //uploadBinary(HaleySession, Channel, HaleyCallback)
+
+//nodejs specific
+if(typeof(module) !== 'undefined') {
+//	module.exports = {
+//		HaleySession: HaleySession,
+//		HaleyAPI: HaleyAPI
+//	}; 
+	module.exports = HaleyAPI;
+}
