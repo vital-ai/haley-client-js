@@ -11,6 +11,7 @@ HaleySession = function(implementation){
 	//default endpoint URI for output messages
 	this.defaultEndpointURI = null;
 	//default userID for output messages
+	//only used in with anonymous sessions 
 	this.defaultUserID = null;
 	//default userName for output messages
 	this.defaultUserName = null;
