@@ -209,6 +209,39 @@ HaleyAPI.prototype.unauthenticateSession = function(haleySession, callback) {
 	this.impl.unauthenticateSession(haleySession, callback);
 }
 
+
+/**
+ * Adds reconnect listener that gets notified on reconnect event.
+ * @return true if new listener, false if already registered.
+ */
+HaleyAPI.prototype.addReconnectListener = function(reconnectListener) {
+	return this.impl.addReconnectListener(reconnectListener);
+}
+
+/**
+ * Removes reconnect listener.
+ * @return true if listener found, false otherwise.
+ */
+HaleyAPI.prototype.removeReconnectListener = function(reconnectListener) {
+	return this.impl.removeReconnectListener(reconnectListener);
+}
+
+/*if(reconnectListeners.contains(reconnectListener)) {
+		return false
+	}
+	reconnectListeners.add(reconnectListener)
+	return true
+}
+
+public boolean removeReconnectListener(Closure reconnectListener) {
+	if(!reconnectListeners.contains(reconnectListener)) {
+		return false
+	}
+	reconnectListeners.remove(reconnectListener)
+	return true
+}
+*/
+
 //uploadBinary(HaleySession, Channel)
 //uploadBinary(HaleySession, Channel, HaleyCallback)
 

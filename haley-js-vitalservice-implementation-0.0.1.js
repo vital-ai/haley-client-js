@@ -19,6 +19,26 @@ HaleyAPIVitalServiceImpl = function(vitalService) {
 	//classesURIs is an object for better efficiency
 	//{ callback, primaryURIs, classesURIs } 
 	
+	this.reconnectListeners = [];
+	
+	var _this = this;
+	
+	this.vitalService.impl.reconnectHandler = function(){
+	
+		if(_this.logEnabled) {
+			
+			console.log("Notifying " + _this.reconnectListeners.length + ' reconnect listener(s)');
+			
+		}
+		
+		for(var i = 0 ; i < _this.reconnectListeners.length; i++) {
+				
+			_this.reconnectListeners[i]();
+				
+		}
+		
+	};
+	
 }
 
 HaleyAPIVitalServiceImpl.SINGLETON = null;
@@ -961,6 +981,44 @@ HaleyAPIVitalServiceImpl.prototype.unauthenticateSession = function(haleySession
 
 //uploadBinary(HaleySession, Channel)
 //uploadBinary(HaleySession, Channel, HaleyCallback)
+
+
+
+
+HaleyAPIVitalServiceImpl.prototype.addReconnectListener = function(reconnectListener) {
+
+
+	if(this.reconnectListeners.indexOf(reconnectListener) >= 0) {
+		if(this.logEnabled) console.log("Reconnect listner already added");
+		return false;
+		
+	} else {
+		
+		if(this.logEnabled) console.log("New reconnect listener added");
+		
+		this.reconnectListeners.push(reconnectListener);
+		
+		return true;
+		
+	}
+	
+}
+
+
+HaleyAPIVitalServiceImpl.prototype.removeReconnectListener = function(reconnectListener) {
+
+	var indexOf = this.reconnectListeners.indexOf(reconnectListener);
+	
+	if(indexOf < 0) {
+		return false;
+	}
+	
+	this.reconnectListeners.splice(indexOf, 1);
+	
+	return true;
+	
+}
+
 
 
 if(typeof(module) !== 'undefined') {
