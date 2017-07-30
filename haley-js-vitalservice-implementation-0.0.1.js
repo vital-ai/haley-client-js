@@ -398,7 +398,7 @@ HaleyAPIVitalServiceImpl.prototype._streamHandler = function(msgRL) {
 		
 		if(h.primaryURIs[type] == true) {
 			if(this.logEnabled) {
-				console.log("Notifying primary type handler: ", h.primaryURIs);
+				//console.log("Notifying primary type handler: ", h.primaryURIs);
 			}
 			h.callback(msgRL);
 			c++;
@@ -415,7 +415,7 @@ HaleyAPIVitalServiceImpl.prototype._streamHandler = function(msgRL) {
 		if(h.classesURIs[type] == true) {
 			
 			if(this.logEnabled) {
-				console.log("Notifying secondary type handler: ", h.classesURIs);
+				//console.log("Notifying secondary type handler: ", h.classesURIs);
 			}
 			h.callback(msgRL);
 			c++;
@@ -428,7 +428,7 @@ HaleyAPIVitalServiceImpl.prototype._streamHandler = function(msgRL) {
 	if(this.defaultHandler != null) {
 		
 		if(this.logEnabled) {
-			console.log("Notifying default handler");
+			//console.log("Notifying default handler");
 		}
 		
 		this.defaultHandler(msgRL);
@@ -1019,6 +1019,69 @@ HaleyAPIVitalServiceImpl.prototype.removeReconnectListener = function(reconnectL
 	
 }
 
+HaleyAPIVitalServiceImpl.prototype.listServerDomainModels = function(callback) {
+
+	console.log("Getting server domains list");
+	
+	if(typeof(module) === 'undefined') {
+		callback("No module object - listServerDomainModels is only available in nodejs context");
+		return;
+	}
+	
+	if(typeof(require) === 'undefined') {
+		callback("No require object - listServerDomainModels is only available in nodejs context");
+		return;
+	}
+	
+	
+	if( !this.vitalService.impl.url ) {
+		callback("No eventbusURL available in vitalService object");
+		return;
+	} 
+	
+	var url = require('url').parse(this.vitalService.impl.url);
+	
+	console.log("eventbus url:", this.vitalService.impl.url);
+	
+	var domainsURL = url.protocol + '//' + url.host + '/domains';
+
+	//Load the request module
+	var request = require('request');
+
+	
+	request({
+	    url: domainsURL,
+	    qs: {}, //Query string data
+	    method: 'GET'
+	}, function(error, response, body){
+	    if(error) {
+	    	console.error("Error when getting user profile data", error);
+	    	callback(error, null);
+	    } else {
+	    	if(response.statusCode == 200) {
+	    		
+	    		console.log(response.statusCode, ( body && body.length > 100 ) ? ( body.substring(0, 97) + "...") : body);
+	    		try {
+	    			
+	    			var parsed = JSON.parse(body);
+	    			var domainsList = [];
+	    			for(var i = 0 ; i < parsed.length; i++) {
+	    				var obj = parsed[i];
+	    				domainsList.push(vitaljs.graphObject(obj));
+	    			}
+	    			
+    				callback(null, domainsList);
+    				
+	    		} catch(e) {
+	    			callback("error when parsing domains json: " + e, null);
+	    		}
+	    	} else {
+	    		console.error("Error when getting domains data " + response.statusCode, body);
+	    	}
+	    }
+	});
+	
+}
 
 
 if(typeof(module) !== 'undefined') {

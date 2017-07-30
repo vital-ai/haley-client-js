@@ -226,21 +226,133 @@ HaleyAPI.prototype.removeReconnectListener = function(reconnectListener) {
 	return this.impl.removeReconnectListener(reconnectListener);
 }
 
-/*if(reconnectListeners.contains(reconnectListener)) {
-		return false
-	}
-	reconnectListeners.add(reconnectListener)
-	return true
+
+/**
+ * callback called with String error, List<DomainModel>
+ */
+HaleyAPI.prototype.listServerDomainModels = function(callback) {
+	return this.impl.listServerDomainModels(callback);
 }
 
-public boolean removeReconnectListener(Closure reconnectListener) {
-	if(!reconnectListeners.contains(reconnectListener)) {
-		return false
-	}
-	reconnectListeners.remove(reconnectListener)
-	return true
+/**
+ * callback called with String error
+ */
+HaleyAPI.prototype.validateDomainModels = function(failIfListElementsDifferent, callback) {
+	
+	this.listServerDomainModels(function(error, models){
+		
+		try {
+			
+			if(error) {
+				callback("Error when listing server domain models: " + error);
+				return;
+			}
+		
+			
+			var localDomains = {};
+			var serverDomains = {};
+			
+			
+			for(var i = 0 ; i < models.length; i++) {
+				var dm = models[i];
+				serverDomains[dm.URI] = dm;
+			}
+			
+			var localDomainsList = [];
+			
+			for(var i = 0 ; i < VitalServiceJson.SINGLETON.dynamicDomains.length; i++) {
+				var ld = VitalServiceJson.SINGLETON.dynamicDomains[i];
+				var dm = vitaljs.graphObject({type: 'http://vital.ai/ontology/vital-core#DomainModel', URI: ld.domainURI});
+				dm.set('name', ld.name);
+				dm.set('domainOWLHash', ld.domainOWLHash);
+				dm.set('versionInfo', ld.version);
+				localDomains[dm.URI] = dm;
+				localDomainsList.push(dm);
+			}
+			
+			if(failIfListElementsDifferent) {
+				
+				var localURIs = Object.keys(localDomains);
+				var serverURIs = Object.keys(serverDomains);
+				
+				//remove all
+//				localURIs.removeAll(serverURIs)
+				for(var i = 0; i < serverURIs.length; i++) {
+					var su = serverURIs[i];
+					var index = localURIs.indexOf(su);
+					if(index >= 0) {
+						localURIs.splice(index, 1);
+					}
+				}
+				
+				if(localURIs.length > 0) {
+					callback("The following domains are loaded only locally: " + localURIs.join(", "));
+					return 
+				}
+				
+				localURIs = Object.keys(localDomains);
+//				serverURIs.removeAll(localURIs)
+				for(var i = 0 ; i < localURIs.length; i++) {
+					var lu = localURIs[i];
+					var index = serverURIs.indexOf(lu);
+					if(index >= 0) {
+						serverURIs.splice(index, 1);
+					}
+				}
+				
+				if(serverURIs.length > 0) {
+					callback("The following domains are loaded only on the server: " + serverURIs.join(", "));
+					return 
+				}
+				 
+			}
+			
+			
+			var differentDomains = [];
+			
+			for(var i = 0 ; i < localDomainsList.length; i++) {
+				
+				var localDomain = localDomainsList[i];
+				
+				var serverDomain = serverDomains[localDomain.URI];
+				
+				if(!failIfListElementsDifferent && serverDomain == null) {
+					continue;
+				}
+
+				var hash1 = localDomain.get('domainOWLHash');
+				var hash2 = serverDomain.get('domainOWLHash');
+				var v1 = localDomain.get('versionInfo');
+				var v2 = serverDomain.get('versionInfo');
+
+				if(hash1 != null && hash1 != hash2) {
+					differentDomains.push(localDomain.URI + " local hash: " + hash1 + " remote hash: " + hash2);
+					continue;
+				}			
+
+				if(v1 != null && v1 != v2) {
+					differentDomains.push(localDomain.URI + " local version: " + v1 + " remote version: " + v2);
+					continue;
+				}		
+				
+				
+			}
+			
+			if(differentDomains.length > 0) {
+				callback("Different domains detected [" + differentDomains.length + "]: " + differentDomains.join(", "));
+				return;
+			}
+			
+			callback(null);
+			
+		} catch(e) {
+			console.error(e);
+			callback("Internal error: " + e);
+		}
+		
+	});
+	
 }
-*/
 
 //uploadBinary(HaleySession, Channel)
 //uploadBinary(HaleySession, Channel, HaleyCallback)
