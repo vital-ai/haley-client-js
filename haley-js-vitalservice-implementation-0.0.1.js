@@ -39,6 +39,9 @@ HaleyAPIVitalServiceImpl = function(vitalService) {
 		
 	};
 	
+	//this timestamp is updated when a new non-hearbeat or non-loggedin/out message is sent
+	this.lastActivityTimestamp = null; 
+	
 }
 
 HaleyAPIVitalServiceImpl.SINGLETON = null;
@@ -784,6 +787,11 @@ HaleyAPIVitalServiceImpl.prototype.sendMessage = function(haleySession, aimpMess
 		return;
 	}
 	
+	if(!vitaljs.isSubclassOf(aimpMessage.type, 'http://vital.ai/ontology/vital-aimp#AIMPMessage')) {
+		callback("aimpMessage must be an instance of AIMPMessage class, type: " + aimpMessage.type);
+		return;
+	}
+	
 	if(aimpMessage.URI == null) {
 		aimpMessage.URI = this._randomURI();
 	}
@@ -794,6 +802,21 @@ HaleyAPIVitalServiceImpl.prototype.sendMessage = function(haleySession, aimpMess
 	
 	if(aimpMessage.get('endpointURI') == null && haleySession.defaultEndpointURI != null ) {
 		aimpMessage.set('endpointURI', haleySession.defaultEndpointURI);
+	}
+	
+	var updateTimestamp = true;
+	
+	var msgType = aimpMessage.type;
+	
+	if(msgType == 'http://vital.ai/ontology/vital-aimp#UserLoggedIn'
+		|| msgType == 'http://vital.ai/ontology/vital-aimp#UserLoggedOut'
+		|| msgType == 'http://vital.ai/ontology/vital-aimp#UserLeftApp') {
+		updateTimestamp = false;
+	} else if(msgType == 'http://vital.ai/ontology/vital-aimp#HeartbeatMessage') {
+		updateTimestamp = false;
+		if(this.lastActivityTimestamp != null) {
+			aimpMessage.set('lastActivityTime', this.lastActivityTimestamp);
+		}
 	}
 	
 	var sessionID = haleySession.getSessionID();
@@ -881,11 +904,6 @@ HaleyAPIVitalServiceImpl.prototype.sendMessage = function(haleySession, aimpMess
 		}
 	}
 	
-	if(!vitaljs.isSubclassOf(aimpMessage.type, 'http://vital.ai/ontology/vital-aimp#AIMPMessage')) {
-		callback("aimpMessage must be an instance of AIMPMessage class, type: " + aimpMessage.type);
-		return;
-	}
-	
 	var rl = vitaljs.resultList();
 	rl.addResult(aimpMessage);
 	
@@ -906,6 +924,10 @@ HaleyAPIVitalServiceImpl.prototype.sendMessage = function(haleySession, aimpMess
 		
 		if(_this.logEnabled) {
 			console.log("message sent successfully", successRL);
+		}
+		
+		if(updateTimestamp) {
+			_this.lastActivityTimestamp = new Date().getTime();
 		}
 		
 		callback();
@@ -1019,12 +1041,57 @@ HaleyAPIVitalServiceImpl.prototype.removeReconnectListener = function(reconnectL
 	
 }
 
+HaleyAPIVitalServiceImpl.prototype._listServerDomainModelsJQueryImpl = function(callback) {
+	
+	console.log("Getting server domains list from saas server");
+
+	if(typeof(document) === 'undefined') {
+		callback("No document object - client side listServerDomainModels not available");
+		return;
+	}
+	
+	if(typeof(jQuery) === 'undefined') {
+		callback("No jQuery object - client side listServerDomainModels not available");
+		return;
+	}
+	
+    var parser  = document.createElement("a");
+    parser.href = this.vitalService.impl.url;
+    
+    var domainsURL = parser.protocol + '//' + parser.host + '/domains';
+    
+	//Load the request module
+	var jqxhr = $.ajax( { method: 'GET', url: domainsURL, cache: false} )
+	.done(function(body) {
+		try {
+			console.log("domains objects", body);
+			var parsed = body;
+   			var domainsList = [];
+   			for(var i = 0 ; i < parsed.length; i++) {
+   				var obj = parsed[i];
+   				domainsList.push(vitaljs.graphObject(obj));
+   			}
+    			
+			callback(null, domainsList);
+				
+   		} catch(e) {
+   			callback("error when parsing domains json: " + e, null);
+   		}
+	}).fail(function(jqXHR, textStatus) {
+		console.error("domains check failed: " + textStatus);
+    	callback(textStatus, null);
+	});
+		
+}
+
 HaleyAPIVitalServiceImpl.prototype.listServerDomainModels = function(callback) {
 
 	console.log("Getting server domains list");
 	
 	if(typeof(module) === 'undefined') {
-		callback("No module object - listServerDomainModels is only available in nodejs context");
+//		callback("No module object - listServerDomainModels is only available in nodejs context");
+//		return;
+		this._listServerDomainModelsJQueryImpl(callback);
 		return;
 	}
 	
