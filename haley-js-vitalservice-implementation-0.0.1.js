@@ -1151,6 +1151,217 @@ HaleyAPIVitalServiceImpl.prototype.listServerDomainModels = function(callback) {
 }
 
 
+HaleyAPIVitalServiceImpl.prototype.uploadFileInBrowser = function(haleySession, fileQuestionMessage, fileObject, callback) {
+	
+	var _this = this;
+	
+	if(fileQuestionMessage == null || fileQuestionMessage.length < 2) {
+		callback("expected at least two elements in fileQuestionMessage");
+		return;
+	}
+	
+	var questionMessage = fileQuestionMessage[0];
+	if(questionMessage.type != 'http://vital.ai/ontology/vital-aimp#QuestionMessage') {
+		callback("expected a QuestionMessage: " + questionMessage.type);
+		return;
+	}
+	
+	var fileQuestion = fileQuestionMessage[1];
+	if(fileQuestion.type != 'http://vital.ai/ontology/vital-aimp#FileQuestion') {
+		callback("not a FileQuestion: " + fileQuestion.type);
+		return;
+	}
+	
+	var scope = fileQuestion.get('fileScope');
+	if(!scope) {
+		callback("no file scope: " + scope);
+		return;
+	}
+	
+    var parser  = document.createElement("a");
+    parser.href = this.vitalService.impl.url;
+    
+    var accountURIs = fileObject.accountURIs;
+    
+    var fileNodeClass = fileObject.fileNodeClass;
+    if(!fileNodeClass) {
+    	fileNodeClass = 'http://vital.ai/ontology/vital#FileNode';
+    }
+    var parentNodeURI = fileObject.parentNodeURI;
+    
+    var url = parser.protocol + '//' + parser.host + '/fileupload';
+    
+    url += '?fileNodeClass=' + encodeURIComponent(fileNodeClass);
+    url += '&scope=' + scope;
+    
+    var currentLogin = this.vitalService.getCurrentLogin();
+    
+    if(currentLogin != null) {
+    	
+    	url += '&authSessionID=' + encodeURIComponent(this.getAuthSessionID(haleySession));
+    	
+    } else {
+    	
+    	//anonymous upload?
+    	url += '&sessionID=' + encodeURIComponent(this.getSessionID(haleySession));
+    	
+    }
+    
+    
+    
+    if(accountURIs != null && accountURIs.length > 0) {
+    	url += '&accountURIs=' + encodeURIComponent(accountURIs.join(','))
+    }
+
+    if(parentNodeURI) {
+    	url += '&parentNodeURI=' + encodeURIComponent(parentNodeURI); 
+    }
+    
+    
+    
+    console.log('upload URL: ' + url);
+    
+	var onFileNodeURI = function(fileNodeURI){
+		
+		//file node URI created, assemble response
+		
+		var am = vitaljs.graphObject({type: 'http://vital.ai/ontology/vital-aimp#AnswerMessage'});
+		am.URI = _this._randomURI();
+		am.set('replyTo', questionMessage.URI);
+		am.set('channelURI', questionMessage.get('channelURI'))
+		am.set('endpointURI', questionMessage.get('endpointURI'));
+		
+
+		var fa = vitaljs.graphObject({type: 'http://vital.ai/ontology/vital-aimp#FileAnswer'});
+		fa.URI = _this._randomURI();
+		fa.set('fileNodeURI', fileNodeURI)
+		
+		_this.sendMessage(_this.haleySessionSingleton, am, [fa], function(error){
+			
+			if(error) {
+				
+				var errMsg = "Error when sending file answer: " + error;
+				
+				console.error(errMsg);
+				
+				callback(errMsg);
+				
+			} else {
+				
+				//answer accepted
+				callback(null);
+				
+			}
+			
+		});
+		
+		
+	};
+	
+	var fd = new FormData();
+	fd.append('upload_file', fileObject.file);
+	
+    var xhr = new XMLHttpRequest();
+	console.log('default timeout: ', xhr.timeout);
+	
+	xhr.open("POST", url, true);
+	xhr.onreadystatechange = function() {
+		
+		if (xhr.readyState == 4) {
+			
+			var error = null;
+			
+			var r = null;
+			
+			var fileNodeURI = null;
+			
+			if(xhr.status == 200) {
+				
+				try {
+					
+					r = JSON.parse(xhr.responseText)
+					
+					if(r.error) {
+						error = r.error
+					} else {
+						
+						fileNodeURI = r.fileNodeURI;
+						
+					}
+					
+				} catch(e) {
+					
+					error = 'response error: ' + e.message;
+					
+				}
+				//parse json
+				
+			} else {
+				
+				error = 'HTTP status ' + xhr.status + ' - ' + xhr.responseText
+				
+			}
+
+			if(error) {
+				
+				callback(error);
+
+			} else {
+				
+				onFileNodeURI(fileNodeURI);
+				
+			}
+
+		}
+
+	};
+
+	xhr.send(fd);
+	
+}
+
+
+HaleyAPIVitalServiceImpl.prototype.cancelFileUpload = function(haleySession, fileQuestionMessage, callback) {
+
+	
+	
+	var questionMessage = fileQuestionMessage[0];
+	
+	//file node URI created, assemble response
+	var am = vitaljs.graphObject({type: 'http://vital.ai/ontology/vital-aimp#AnswerMessage'});
+	am.URI = this._randomURI();
+	
+	
+	am.set('replyTo', questionMessage.URI);
+	am.set('channelURI', questionMessage.get('channelURI'))
+	am.set('endpointURI', questionMessage.get('endpointURI'));
+	am.set('answerSkipped', true);
+
+	var fa = vitaljs.graphObject({type: 'http://vital.ai/ontology/vital-aimp#FileAnswer'});
+	fa.URI = this._randomURI();
+	fa.set('fileNodeURI', null)
+	
+	this.sendMessage(this.haleySessionSingleton, am, [fa], function(error){
+		
+		if(error) {
+			
+			var errMsg = "Error when sending file answer skip: " + error;
+			
+			console.error(errMsg);
+			
+			callback(errMsg);
+			
+		} else {
+			
+			//answer skip accepted
+			callback(null);
+			
+		}
+		
+	});
+	
+}
+
 if(typeof(module) !== 'undefined') {
 
 //	if(typeof(VitalService) === 'undefined') {

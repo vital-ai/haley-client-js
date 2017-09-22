@@ -354,6 +354,34 @@ HaleyAPI.prototype.validateDomainModels = function(failIfListElementsDifferent, 
 	
 }
 
+/**
+ * Takes care of file upload in response to a File Question
+ * @param haleySession
+ * @param fileQuestionMessage [QuestionMessage, FileQuestion]
+ * @param fileObject, an object 
+ * 	{ 
+ * 		file: <from file inputfile>,
+ * 		accountURIs: <list of additional accountsURIs to be added to file node>,
+ *      fileNodeClass: optional fileNodeClass, default: 'http://vital.ai/ontology/vital#FileNode',
+ *      parentNodeURI: optional parent of the filenode, defaults to accountURI
+ *  }
+ *  selected in some form
+ * @param callback (error)
+ */
+HaleyAPI.prototype.uploadFileInBrowser = function(haleySession, fileQuestionMessage, fileObject, callback) {
+	this.impl.uploadFileInBrowser(haleySession, fileQuestionMessage, fileObject, callback);
+}
+
+/**
+ * Cancels a spawned file upload
+ * @param haleySession
+ * @param fileQuestionMessage
+ * @param callback
+ */
+HaleyAPI.prototype.cancelFileUpload = function(haleySession, fileQuestionMessage, callback) {
+	this.impl.cancelFileUpload(haleySession, fileQuestionMessage, callback);
+}
+
 //uploadBinary(HaleySession, Channel)
 //uploadBinary(HaleySession, Channel, HaleyCallback)
 
