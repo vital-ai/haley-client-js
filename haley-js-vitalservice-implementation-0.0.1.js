@@ -1189,10 +1189,11 @@ HaleyAPIVitalServiceImpl.prototype.uploadFileInBrowser = function(haleySession, 
     }
     var parentNodeURI = fileObject.parentNodeURI;
     
-    var url = parser.protocol + '//' + parser.host + '/fileupload';
+    var url = parser.protocol + '//' + parser.host + '/fileupload/';
     
-    url += '?fileNodeClass=' + encodeURIComponent(fileNodeClass);
-    url += '&scope=' + scope;
+//    url += '?fileNodeClass=' + encodeURIComponent(fileNodeClass);
+    url += '?temporary=true'
+//    url += '&scope=' + scope;
     
     var currentLogin = this.vitalService.getCurrentLogin();
     
@@ -1209,19 +1210,20 @@ HaleyAPIVitalServiceImpl.prototype.uploadFileInBrowser = function(haleySession, 
     
     
     
-    if(accountURIs != null && accountURIs.length > 0) {
-    	url += '&accountURIs=' + encodeURIComponent(accountURIs.join(','))
-    }
-
-    if(parentNodeURI) {
-    	url += '&parentNodeURI=' + encodeURIComponent(parentNodeURI); 
-    }
-    
+//    if(accountURIs != null && accountURIs.length > 0) {
+//    	url += '&accountURIs=' + encodeURIComponent(accountURIs.join(','))
+//    }
+//
+//    if(parentNodeURI) {
+//    	url += '&parentNodeURI=' + encodeURIComponent(parentNodeURI); 
+//    }
+//    
     
     
     console.log('upload URL: ' + url);
     
-	var onFileNodeURI = function(fileNodeURI){
+    //old way
+	var onFileNodeURI = function(fileNodeURI, newFileNode){
 		
 		//file node URI created, assemble response
 		
@@ -1249,14 +1251,98 @@ HaleyAPIVitalServiceImpl.prototype.uploadFileInBrowser = function(haleySession, 
 			} else {
 				
 				//answer accepted
-				callback(null);
+				callback(null, newFileNode);
 				
 			}
 			
 		});
 		
+		//the dialog has to answer with a filenode now
+		
 		
 	};
+	
+	var onFileDataResponse = function(data) {
+	
+		console.log('file data received: ', data);
+		
+	
+		var am = vitaljs.graphObject({type: 'http://vital.ai/ontology/vital-aimp#AnswerMessage'});
+		am.URI = _this._randomURI();
+		am.set('replyTo', questionMessage.URI);
+		am.set('channelURI', questionMessage.get('channelURI'))
+		am.set('endpointURI', questionMessage.get('endpointURI'));
+		
+//		var fileName.fileName
+
+		var fa = vitaljs.graphObject({type: 'http://vital.ai/ontology/vital-aimp#FileAnswer'});
+		fa.URI = _this._randomURI();
+		fa.set('fileNodeClassURI', fileNodeClass);
+		fa.set('parentObjectURI', parentNodeURI);
+		fa.set('url', data.url);
+		fa.set('fileName', data.fileName);
+		fa.set('fileType', data.fileType);
+		fa.set('fileLength', data.fileLength);
+		fa.set('deleteOnSuccess', true);
+		
+		_this.sendMessageWithRequestCallback(_this.haleySessionSingleton, am, [fa], function(error){
+			
+			if(error) {
+				
+				var errMsg = "Error when sending file answer: " + error;
+				
+				console.error(errMsg);
+				
+//				callback(errMsg);
+				
+			} else {
+				
+				console.log('file upload answer sent');
+				//answer accepted
+//				callback(null, newFileNode);
+				
+			}
+			
+		}, function(msgRL){
+			
+			var msg = msgRL.first();
+			
+			console.log('file upload response:', msg);
+			
+			if(msg.type != 'http://vital.ai/ontology/vital-aimp#MetaQLResultsMessage') {
+				return true;
+			}
+			
+			var status = msg.get('status');
+			
+			if(status != 'ok') {
+				var statusMessage = msg.get('statusMessage');
+				if(!statusMessage) statusMessage = 'unknow file upload error';
+				callback(statusMessage);
+				return false;
+			}
+			
+			var fileNode = null;
+			
+			var fileNodes = msgRL.iterator('http://vital.ai/ontology/vital#FileNode');
+			
+			if(fileNodes.length > 0) {
+				fileNode = fileNodes[0];
+			}
+			
+			if(fileNode == null) {
+				callback('no file node in the response');
+				return false;
+			}
+			
+			callback(null, fileNode);
+			
+			return false;
+			
+		});
+		
+		
+	}
 	
 	var fd = new FormData();
 	fd.append('upload_file', fileObject.file);
@@ -1273,7 +1359,11 @@ HaleyAPIVitalServiceImpl.prototype.uploadFileInBrowser = function(haleySession, 
 			
 			var r = null;
 			
-			var fileNodeURI = null;
+//			var fileNodeURI = null;
+//			
+//			var newFileNode = null;
+			
+			var fileData = null;
 			
 			if(xhr.status == 200) {
 				
@@ -1285,7 +1375,21 @@ HaleyAPIVitalServiceImpl.prototype.uploadFileInBrowser = function(haleySession, 
 						error = r.error
 					} else {
 						
-						fileNodeURI = r.fileNodeURI;
+						if(r.temporary == true) {
+							
+							fileData = r;
+							
+						} else {
+							
+							error = 'only temporary response accepted';
+							
+//							fileNodeURI = r.fileNodeURI;
+//							
+//							newFileNode = vitaljs.graphObject( r.fileNode );
+							
+						}
+						
+						
 						
 					}
 					
@@ -1308,7 +1412,9 @@ HaleyAPIVitalServiceImpl.prototype.uploadFileInBrowser = function(haleySession, 
 
 			} else {
 				
-				onFileNodeURI(fileNodeURI);
+//				onFileNodeURI(fileNodeURI, newFileNode);
+				
+				onFileDataResponse(fileData);
 				
 			}
 

@@ -366,7 +366,7 @@ HaleyAPI.prototype.validateDomainModels = function(failIfListElementsDifferent, 
  *      parentNodeURI: optional parent of the filenode, defaults to accountURI
  *  }
  *  selected in some form
- * @param callback (error)
+ * @param callback (error, fileNode)
  */
 HaleyAPI.prototype.uploadFileInBrowser = function(haleySession, fileQuestionMessage, fileObject, callback) {
 	this.impl.uploadFileInBrowser(haleySession, fileQuestionMessage, fileObject, callback);
