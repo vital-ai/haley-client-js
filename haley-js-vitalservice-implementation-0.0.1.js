@@ -42,6 +42,40 @@ HaleyAPIVitalServiceImpl = function(vitalService) {
 	//this timestamp is updated when a new non-hearbeat or non-loggedin/out message is sent
 	this.lastActivityTimestamp = null; 
 	
+	this.cachedCredentials = {};
+	
+	
+	//from vital service url
+	this.saasServerURL = null;
+	
+	if( !this.vitalService.impl.url ) {
+		throw "No eventbusURL available in vitalService object";
+		return;
+	}
+	
+	var protocol = null;
+	var host = null;
+	//port ?
+	
+	if(typeof(module) === 'undefined') {
+		
+		var parser  = document.createElement("a");
+		parser.href = this.vitalService.impl.url;
+		
+		protocol = parser.protocol;
+		host = parser.host;
+		
+	} else {
+		
+		var url = require('url').parse(this.vitalService.impl.url);
+
+		protocol = url.protocol;
+		host = url.host;
+		
+	}
+
+	this.saasServerURL = protocol + '//' + host;
+	
 }
 
 HaleyAPIVitalServiceImpl.SINGLETON = null;
@@ -139,6 +173,11 @@ HaleyAPIVitalServiceImpl.prototype.authenticateSession = function(haleySession, 
 			console.log("auth success: ", loginSuccess);
 		}
 
+		var sessionID = haleySession.getSessionID();
+
+		//credentials caching not supported yet
+//		_this.cachedCredentials[sessionID] = {username: username, password: password};
+		
 		_this._sendLoggedInMsg(function(error){
 
 			if(_this.logEnabled) {
@@ -767,17 +806,21 @@ HaleyAPIVitalServiceImpl.prototype._randomURI = function() {
 
 HaleyAPIVitalServiceImpl.prototype.sendMessage = function(haleySession, aimpMessage, graphObjectsListOrCallback, callback) {
 	
+	var graphObjectsList = null;
+	
 	if(arguments.length == 3) {
 		callback = graphObjectsListOrCallback;
-		graphObjectsListOrCallback = null;
 	} else if(arguments.length == 4) {
 		//ok
+		graphObjectsList = graphObjectsListOrCallback;
 	} else {
+		console.error("expected 3 or 4 arguments");
 		callback("expected 3 or 4 arguments");
 		return;
 	}
 	
 	if(typeof(callback) !== 'function') {
+		console.error("callback param must be a function");
 		callback("callback param must be a function");
 		return;
 	}
@@ -786,6 +829,12 @@ HaleyAPIVitalServiceImpl.prototype.sendMessage = function(haleySession, aimpMess
 		callback("aimpMessage must not be null");
 		return;
 	}
+	
+	this.sendMessageImpl(haleySession, aimpMessage, graphObjectsList, 0, callback);
+	
+}
+	
+HaleyAPIVitalServiceImpl.prototype.sendMessageImpl = function(haleySession, aimpMessage, graphObjectsList, retryCount, callback) {
 	
 	if(!vitaljs.isSubclassOf(aimpMessage.type, 'http://vital.ai/ontology/vital-aimp#AIMPMessage')) {
 		callback("aimpMessage must be an instance of AIMPMessage class, type: " + aimpMessage.type);
@@ -907,9 +956,9 @@ HaleyAPIVitalServiceImpl.prototype.sendMessage = function(haleySession, aimpMess
 	var rl = vitaljs.resultList();
 	rl.addResult(aimpMessage);
 	
-	if(graphObjectsListOrCallback != null) {
-		for(var i = 0 ; i < graphObjectsListOrCallback.length; i++) {
-			rl.addResult(graphObjectsListOrCallback[i]);
+	if(graphObjectsList != null) {
+		for(var i = 0 ; i < graphObjectsList.length; i++) {
+			rl.addResult(graphObjectsList[i]);
 		}
 	}
 	
@@ -936,6 +985,44 @@ HaleyAPIVitalServiceImpl.prototype.sendMessage = function(haleySession, aimpMess
 		
 		console.error("error when sending message: " + error);
 		
+		if( retryCount == 0 && error && error.indexOf('error_denied') == 0) {
+			
+			var cachedCredentials = _this.cachedCredentials[sessionID];
+			
+			if(cachedCredentials != null) {
+				
+				if(_this.logEnabled) console.log("Session not found, re-authenticating...");
+				
+				//this info updated in vitalservice instance
+//				haleySession.authAccount = null
+//				haleySession.authenticated = false
+//				haleySession.authSessionID = null
+//				vitalService.appSessionID = null
+				
+				_this.authenticateSession(haleySession, cachedCredentials.username, cachedCredentials.password, function(authError, login){
+			
+					if(! authError ) {
+						if(_this.logEnabled) console.log("Successfully reauthenticated the session, sending the message");
+						_this.sendMessageImpl(haleySession, aimpMessage, graphObjectsList, retryCount + 1, callback);
+						
+					} else {
+						
+						console.error("Reauthentication attempt failed: ", authError);
+						
+						callback(error);
+						
+						return
+						
+					}
+					
+				});
+				
+				return;
+				
+			}
+			
+		}
+		
 		callback(error);
 		
 	});
@@ -958,6 +1045,11 @@ HaleyAPIVitalServiceImpl.prototype.unauthenticateSession = function(haleySession
 	if(e) {
 		callback(e);
 		return;
+	}
+	
+	var sessionID = haleySession.getSessionID();
+	if(sessionID != null) {
+		delete this.cachedCredentials[sessionID];
 	}
 	
 	if(!haleySession.isAuthenticated()) {
@@ -1100,17 +1192,7 @@ HaleyAPIVitalServiceImpl.prototype.listServerDomainModels = function(callback) {
 		return;
 	}
 	
-	
-	if( !this.vitalService.impl.url ) {
-		callback("No eventbusURL available in vitalService object");
-		return;
-	} 
-	
-	var url = require('url').parse(this.vitalService.impl.url);
-	
-	console.log("eventbus url:", this.vitalService.impl.url);
-	
-	var domainsURL = url.protocol + '//' + url.host + '/domains';
+	var domainsURL = this.saasServerURL + '/domains';
 
 	//Load the request module
 	var request = require('request');
@@ -1152,8 +1234,31 @@ HaleyAPIVitalServiceImpl.prototype.listServerDomainModels = function(callback) {
 
 
 HaleyAPIVitalServiceImpl.prototype.uploadFileInBrowser = function(haleySession, fileQuestionMessage, fileObject, callback) {
+	this._uploadFileImpl(true, haleySession, fileQuestionMessage, fileObject, callback);
+}	
+HaleyAPIVitalServiceImpl.prototype.uploadFile = function(haleySession, fileQuestionMessage, fileObject, callback) {
+	this._uploadFileImpl(false, haleySession, fileQuestionMessage, fileObject, callback);
+}
+
+HaleyAPIVitalServiceImpl.prototype._uploadFileImpl = function(isBrowser, haleySession, fileQuestionMessage, fileObject, callback) {	
 	
 	var _this = this;
+	
+	if(isBrowser) {
+		
+		if( fileObject.file == null ) {
+			callback("no form 'file' object in fileObject param");
+			return;
+		}
+		
+	} else {
+		
+		if( fileObject.filePath == null || fileObject.filePath.length == 0 ) {
+			callback("no 'filePath' string in  fileObject param");
+			return;
+		}
+		
+	}
 	
 	if(fileQuestionMessage == null || fileQuestionMessage.length < 2) {
 		callback("expected at least two elements in fileQuestionMessage");
@@ -1178,10 +1283,8 @@ HaleyAPIVitalServiceImpl.prototype.uploadFileInBrowser = function(haleySession, 
 		return;
 	}
 	
-    var parser  = document.createElement("a");
-    parser.href = this.vitalService.impl.url;
+	var accountURIs = fileObject.accountURIs;
     
-    var accountURIs = fileObject.accountURIs;
     
     var fileNodeClass = fileObject.fileNodeClass;
     if(!fileNodeClass) {
@@ -1189,7 +1292,7 @@ HaleyAPIVitalServiceImpl.prototype.uploadFileInBrowser = function(haleySession, 
     }
     var parentNodeURI = fileObject.parentNodeURI;
     
-    var url = parser.protocol + '//' + parser.host + '/fileupload/';
+    var url = this.saasServerURL + '/fileupload/';
     
 //    url += '?fileNodeClass=' + encodeURIComponent(fileNodeClass);
     url += '?temporary=true'
@@ -1344,85 +1447,159 @@ HaleyAPIVitalServiceImpl.prototype.uploadFileInBrowser = function(haleySession, 
 		
 	}
 	
-	var fd = new FormData();
-	fd.append('upload_file', fileObject.file);
-	
-    var xhr = new XMLHttpRequest();
-	console.log('default timeout: ', xhr.timeout);
-	
-	xhr.open("POST", url, true);
-	xhr.onreadystatechange = function() {
+	if(isBrowser) {
 		
-		if (xhr.readyState == 4) {
+		var fd = new FormData();
+		fd.append('upload_file', fileObject.file);
+		
+	    var xhr = new XMLHttpRequest();
+		console.log('default timeout: ', xhr.timeout);
+		
+		xhr.open("POST", url, true);
+		xhr.onreadystatechange = function() {
 			
-			var error = null;
-			
-			var r = null;
-			
-//			var fileNodeURI = null;
-//			
-//			var newFileNode = null;
-			
-			var fileData = null;
-			
-			if(xhr.status == 200) {
+			if (xhr.readyState == 4) {
 				
-				try {
+				var error = null;
+				
+				var r = null;
+				
+//				var fileNodeURI = null;
+//				
+//				var newFileNode = null;
+				
+				var fileData = null;
+				
+				if(xhr.status == 200) {
 					
-					r = JSON.parse(xhr.responseText)
-					
-					if(r.error) {
-						error = r.error
-					} else {
+					try {
 						
-						if(r.temporary == true) {
-							
-							fileData = r;
-							
+						r = JSON.parse(xhr.responseText)
+						
+						if(r.error) {
+							error = r.error
 						} else {
 							
-							error = 'only temporary response accepted';
+							if(r.temporary == true) {
+								
+								fileData = r;
+								
+							} else {
+								
+								error = 'only temporary response accepted';
+								
+//								fileNodeURI = r.fileNodeURI;
+//								
+//								newFileNode = vitaljs.graphObject( r.fileNode );
+								
+							}
 							
-//							fileNodeURI = r.fileNodeURI;
-//							
-//							newFileNode = vitaljs.graphObject( r.fileNode );
+							
 							
 						}
 						
+					} catch(e) {
 						
+						error = 'response error: ' + e.message;
+						
+					}
+					//parse json
+					
+				} else {
+					
+					error = 'HTTP status ' + xhr.status + ' - ' + xhr.responseText
+					
+				}
+
+				if(error) {
+					
+					callback(error);
+
+				} else {
+					
+//					onFileNodeURI(fileNodeURI, newFileNode);
+					
+					onFileDataResponse(fileData);
+					
+				}
+
+			}
+
+		};
+
+		xhr.send(fd);
+		
+	} else {
+		
+		var fs = require('fs');
+		
+		var request = require('request');
+		
+		var formData = {};
+		
+		try {
+			console.log("uploading file from location: " + fileObject.filePath);
+			var rs = fs.createReadStream(fileObject.filePath);
+			console.log("readstream", rs);
+			formData['upload_file'] = rs;
+		} catch(e) {
+			console.error("error when starting upload: ", e);
+			callback("error when starting upload: " + e.message);
+			return;
+		}
+		
+		var req = request.post({url:url, formData: formData}, function (err, resp, body) {
+		  
+			if (err) {
+				console.error(err);
+				callback("Error when uploading file: " + err);
+				return;
+			}
+			console.log('Server response: ' + body);
+			
+			var fileData = null;
+			
+			var error = null;
+			
+			try {
+				
+				r = JSON.parse(body);
+				
+				if(r.error) {
+					error = r.error
+				} else {
+					
+					if(r.temporary == true) {
+						
+						fileData = r;
+						
+					} else {
+						
+						error = 'only temporary response accepted';
 						
 					}
 					
-				} catch(e) {
-					
-					error = 'response error: ' + e.message;
-					
 				}
-				//parse json
 				
-			} else {
+			} catch(e) {
 				
-				error = 'HTTP status ' + xhr.status + ' - ' + xhr.responseText
+				error = 'response error: ' + e.message;
 				
 			}
-
+			
 			if(error) {
 				
 				callback(error);
 
 			} else {
 				
-//				onFileNodeURI(fileNodeURI, newFileNode);
-				
 				onFileDataResponse(fileData);
 				
 			}
-
-		}
-
-	};
-
-	xhr.send(fd);
+			
+		});
+		
+	}
 	
 }
 
@@ -1465,6 +1642,64 @@ HaleyAPIVitalServiceImpl.prototype.cancelFileUpload = function(haleySession, fil
 		}
 		
 	});
+	
+}
+
+
+HaleyAPIVitalServiceImpl.s3URLPattern = /^s3\:\/\/([^\/]+)\/(.+)$/;
+
+HaleyAPIVitalServiceImpl.prototype.getFileNodeDownloadURL = function(haleySession, fileNode) {
+
+	var scope = fileNode.get('fileScope');
+	
+	if(!scope) scope = 'public';
+	
+	if('PRIVATE' === scope.toUpperCase()) {
+			
+		return this.getFileNodeURIDownloadURL(haleySession, fileNode.URI);
+		
+	} else {
+		
+		//just convert s3 to public https link
+		var fileURL = fileNode.get('fileURL');
+		var res = HaleyAPIVitalServiceImpl.s3URLPattern.exec(fileURL);
+		if(res != null) {
+			
+			var bucket = res[1];
+			var key = res[2];
+		
+			var keyEscaped = key.replace(new RegExp('%', 'g'), '%25')
+			
+			return 'https://' + bucket + '.s3.amazonaws.com/' + keyEscaped;
+			
+		}
+		
+		return fileURL;
+		
+	}
+	
+	
+}
+
+/**
+ * Returns the download URL for given file node URI
+ */
+HaleyAPIVitalServiceImpl.prototype.getFileNodeURIDownloadURL = function(haleySession, fileNodeURI) {
+
+	var url = this.saasServerURL + '/filedownload?fileURI=' + encodeURIComponent(fileNodeURI);
+	
+	if(haleySession.isAuthenticated()) {
+		
+		url += '&authSessionID=' + encodeURIComponent(this.getAuthSessionID(haleySession));
+	    
+	} else {
+		
+		url += '&sessionID=' + encodeURIComponent(this.getSessionID(haleySession));
+		
+	}
+	
+	return url;
+	
 	
 }
 

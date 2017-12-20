@@ -102,8 +102,7 @@ HaleyAPI.prototype.getDefaultCallback = function(haleySession) {
 }
 
 
-//downloadBinary(HaleySession, String, Channel)
-//downloadBinary(HaleySession, String, Channel, HaleyCallback)
+
 //getActiveThreadCount()
 HaleyAPI.prototype.getSessions = function() {
 	return this.impl.getSessions();
@@ -372,6 +371,25 @@ HaleyAPI.prototype.uploadFileInBrowser = function(haleySession, fileQuestionMess
 	this.impl.uploadFileInBrowser(haleySession, fileQuestionMessage, fileObject, callback);
 }
 
+
+/**
+ * Uploads file in non-browser environment in response to a File Question
+ * @param haleySession
+ * @param fileQuestionMessage [QuestionMessage, FileQuestion]
+ * @param fileObject, an object 
+ * 	{ 
+ * 		filePath: pathToLocalFile,
+ * 		accountURIs: <list of additional accountsURIs to be added to file node>,
+ *      fileNodeClass: optional fileNodeClass, default: 'http://vital.ai/ontology/vital#FileNode',
+ *      parentNodeURI: optional parent of the filenode, defaults to accountURI
+ *  }
+ *  selected in some form
+ * @param callback (error, fileNode)
+ */
+HaleyAPI.prototype.uploadFile = function(haleySession, fileQuestionMessage, fileObject, callback) {
+	this.impl.uploadFile(haleySession, fileQuestionMessage, fileObject, callback);
+}
+
 /**
  * Cancels a spawned file upload
  * @param haleySession
@@ -382,8 +400,22 @@ HaleyAPI.prototype.cancelFileUpload = function(haleySession, fileQuestionMessage
 	this.impl.cancelFileUpload(haleySession, fileQuestionMessage, callback);
 }
 
-//uploadBinary(HaleySession, Channel)
-//uploadBinary(HaleySession, Channel, HaleyCallback)
+
+/**
+ * Returns the download URL for given file node. Private URLs contain sessionID.
+ */
+HaleyAPI.prototype.getFileNodeDownloadURL = function(haleySession, fileNode) {
+	return this.impl.getFileNodeDownloadURL(haleySession, fileNode);
+}
+
+/**
+ * Returns the download URL for given file node URI
+ */
+HaleyAPI.prototype.getFileNodeURIDownloadURL = function(haleySession, fileNodeURI) {
+	return this.impl.getFileNodeURIDownloadURL(haleySession, fileNodeURI);
+}
+
+
 
 //nodejs specific
 if(typeof(module) !== 'undefined') {
