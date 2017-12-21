@@ -73,6 +73,10 @@ HaleyAPI.prototype.authenticateSession = function(haleySession, username, passwo
 }
 
 
+HaleyAPI.prototype.close = function(callback) {
+	this.impl.close(callback);
+}
+
 HaleyAPI.prototype.closeAllSessions = function(callback) {
 	this.impl.closeAllSessions(callback);
 }

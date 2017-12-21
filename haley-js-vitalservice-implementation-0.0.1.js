@@ -217,6 +217,23 @@ HaleyAPIVitalServiceImpl.prototype.closeAllSessions = function(callback) {
 	
 }
 
+HaleyAPIVitalServiceImpl.prototype.close = function(callback) {
+	
+	this.vitalService.close(function(){
+		
+		console.log("haley api closed");
+		
+		callback(null);
+		
+	}, function(error){
+		
+		console.error(error);
+		
+		callback(error);
+		
+	});
+	
+}
 
 HaleyAPIVitalServiceImpl.prototype.closeSession = function(haleySession, callack) {
 	
