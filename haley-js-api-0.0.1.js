@@ -420,6 +420,22 @@ HaleyAPI.prototype.getFileNodeURIDownloadURL = function(haleySession, fileNodeUR
 }
 
 
+/**
+ * add a listener notified with (error, haleySession, aimpMessage, payload)
+ * returns true if added, false if already added
+ */
+HaleyAPI.prototype.addAIMPMessageSentListener = function(listener) {
+	return this.impl.addAIMPMessageSentListener(listener);
+}
+
+/**
+ * remove an AIMP message sent listener
+ * returns true if removed, false if was not added 
+ */
+HaleyAPI.prototype.removeAIMPMessageSentListener = function(listener) {
+	return this.impl.removeAIMPMessageSentListener(listener);
+} 
+
 
 //nodejs specific
 if(typeof(module) !== 'undefined') {

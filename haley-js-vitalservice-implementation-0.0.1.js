@@ -75,6 +75,8 @@ HaleyAPIVitalServiceImpl = function(vitalService) {
 	}
 
 	this.saasServerURL = protocol + '//' + host;
+
+	this.aimpMessageSentListeners = [];
 	
 }
 
@@ -996,6 +998,11 @@ HaleyAPIVitalServiceImpl.prototype.sendMessageImpl = function(haleySession, aimp
 			_this.lastActivityTimestamp = new Date().getTime();
 		}
 		
+		for(var i = 0 ; i < _this.aimpMessageSentListeners.length; i++) {
+			var listener = _this.aimpMessageSentListeners[i];
+			listener(haleySession, aimpMessage, graphObjectsList);
+		}
+		
 		callback();
 		
 	}, function(error){
@@ -1719,6 +1726,28 @@ HaleyAPIVitalServiceImpl.prototype.getFileNodeURIDownloadURL = function(haleySes
 	
 	
 }
+
+/**
+ * add a listener notified with (error, haleySession, aimpMessage, payload)
+ * returns true if added, false if already added
+ */
+HaleyAPIVitalServiceImpl.prototype.addAIMPMessageSentListener = function(listener) {
+	if( this.aimpMessageSentListeners.indexOf(listener) >= 0) return false;
+	this.aimpMessageSentListeners.push(listener);
+	return true;
+}
+
+/**
+ * remove an AIMP message sent listener
+ * returns true if removed, false if was not added 
+ */
+HaleyAPIVitalServiceImpl.prototype.removeAIMPMessageSentListener = function(listener) {
+	var index = this.aimpMessageSentListeners.indexOf(listener);
+	if(index < 0) return false;
+	this.aimpMessageSentListeners.splice(index, 1);
+	return true;
+} 
+
 
 if(typeof(module) !== 'undefined') {
 
