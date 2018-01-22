@@ -5,6 +5,9 @@ HaleyAPIVitalServiceImpl = function(vitalService) {
 	this.haleySessionSingleton = null;
 	this.streamName = 'haley';
 	
+	//default logger
+	this.logger = console; 
+	
 	this.handlers = [];
 	
 	//requestURI -> callback
@@ -27,7 +30,7 @@ HaleyAPIVitalServiceImpl = function(vitalService) {
 	
 		if(_this.logEnabled) {
 			
-			console.log("Notifying " + _this.reconnectListeners.length + ' reconnect listener(s)');
+			_this.logger.info("Notifying " + _this.reconnectListeners.length + ' reconnect listener(s)');
 			
 		}
 		
@@ -172,7 +175,7 @@ HaleyAPIVitalServiceImpl.prototype.authenticateSession = function(haleySession, 
 	this.vitalService.callFunction(VitalServiceWebsocketImpl.vitalauth_login, {loginType: 'Login', username: username, password: password}, function(loginSuccess){
 			
 		if(_this.logEnabled) {
-			console.log("auth success: ", loginSuccess);
+			_this.logger.info("auth success: ", loginSuccess);
 		}
 
 		var sessionID = haleySession.getSessionID();
@@ -183,7 +186,7 @@ HaleyAPIVitalServiceImpl.prototype.authenticateSession = function(haleySession, 
 		_this._sendLoggedInMsg(function(error){
 
 			if(_this.logEnabled) {
-				console.log("loggedin msg sent");
+				_this.logger.info("loggedin msg sent");
 			}
 			
 			if(error) {
@@ -199,7 +202,7 @@ HaleyAPIVitalServiceImpl.prototype.authenticateSession = function(haleySession, 
 			
 	}, function(loginError) {
 			
-		console.error("Login error: ", loginError);
+		_this.logger.error("Login error: ", loginError);
 		
 		callback(loginError);
 	});
@@ -221,15 +224,17 @@ HaleyAPIVitalServiceImpl.prototype.closeAllSessions = function(callback) {
 
 HaleyAPIVitalServiceImpl.prototype.close = function(callback) {
 	
+	var _this = this;
+	
 	this.vitalService.close(function(){
 		
-		console.log("haley api closed");
+		_this.logger.info("haley api closed");
 		
 		callback(null);
 		
 	}, function(error){
 		
-		console.error(error);
+		_this.logger.error(error);
 		
 		callback(error);
 		
@@ -250,7 +255,7 @@ HaleyAPIVitalServiceImpl.prototype.closeSession = function(haleySession, callack
 		_this.vitalService.callFunction(VitalService.JS_UNREGISTER_STREAM_HANDLER, {streamName: _this.streamName, handlerFunction: _this.handlerFunction}, function(succsessObj){
 			
 			if(_this.logEnabled) {
-				console.log('unregistered handler for stream ' + _this.streamName, succsessObj);
+				_this.logger.info('unregistered handler for stream ' + _this.streamName, succsessObj);
 			}
 			
 			_this.haleySessionSingleton = null;
@@ -261,7 +266,7 @@ HaleyAPIVitalServiceImpl.prototype.closeSession = function(haleySession, callack
 			
 		}, function(error){
 
-			console.error('couldn\'t deregister messages handler', error);
+			_this.logger.error('couldn\'t deregister messages handler', error);
 			
 			callback(error);
 			
@@ -275,14 +280,14 @@ HaleyAPIVitalServiceImpl.prototype.closeSession = function(haleySession, callack
 		_this.vitalService.callFunction(VitalService.VERTX_STREAM_UNSUBSCRIBE, {streamName: _this.streamName}, function(succsessObj){
 			
 			if(_this.logEnabled) {
-				console.log("unsubscribed from stream " + _this.streamName, succsessObj); 
+				_this.logger.info("unsubscribed from stream " + _this.streamName, succsessObj); 
 			}
 			
 			afterUnsubscribed();
 			
 		}, function(errorObj) {
 			
-			console.error("Error when unsubscribing from stream", errorObj);
+			_this.logger.error("Error when unsubscribing from stream", errorObj);
 			
 			callack(errorObj);
 			
@@ -298,7 +303,7 @@ HaleyAPIVitalServiceImpl.prototype.closeSession = function(haleySession, callack
 		this.unauthenticateSession(haleySession, function(error){
 			
 			if(error) {
-				console.error(error);
+				_this.logger.error(error);
 			}
 
 			afterUnauth();
@@ -394,7 +399,7 @@ HaleyAPIVitalServiceImpl.prototype.getSessions = function() {
 HaleyAPIVitalServiceImpl.prototype._streamHandler = function(msgRL) {
 
 	if(this.logEnabled) {
-		console.log("Stream " + this.streamName + "received message: ", msgRL);
+		this.logger.info("Stream " + this.streamName + "received message: ", msgRL);
 	}
 	
 	var m = msgRL.first();
@@ -421,7 +426,7 @@ HaleyAPIVitalServiceImpl.prototype._streamHandler = function(msgRL) {
 		if(h != null) {
 			
 			if(this.logEnabled) {
-				console.log("Notifying requestURI handler", requestURI);
+				this.logger.info("Notifying requestURI handler", requestURI);
 			}
 			
 			var cbRes = h(msgRL);
@@ -429,7 +434,7 @@ HaleyAPIVitalServiceImpl.prototype._streamHandler = function(msgRL) {
 			if(cbRes != null && cbRes == false) {
 				
 				if(this.logEnabled) {
-					console.log("RequestURI handler returned false, unregistering");
+					this.logger.info("RequestURI handler returned false, unregistering");
 				}
 				
 				delete this.requestHandlers[requestURI];
@@ -438,7 +443,7 @@ HaleyAPIVitalServiceImpl.prototype._streamHandler = function(msgRL) {
 				
 				if(this.logEnabled) {
 					
-					console.log("RequestURI handler returned non-false, still regsitered");
+					this.logger.info("RequestURI handler returned non-false, still regsitered");
 					
 				} 
 					
@@ -459,7 +464,7 @@ HaleyAPIVitalServiceImpl.prototype._streamHandler = function(msgRL) {
 		
 		if(h.primaryURIs[type] == true) {
 			if(this.logEnabled) {
-				//console.log("Notifying primary type handler: ", h.primaryURIs);
+//				this.logger.info("Notifying primary type handler: ", h.primaryURIs);
 			}
 			h.callback(msgRL);
 			c++;
@@ -476,7 +481,7 @@ HaleyAPIVitalServiceImpl.prototype._streamHandler = function(msgRL) {
 		if(h.classesURIs[type] == true) {
 			
 			if(this.logEnabled) {
-				//console.log("Notifying secondary type handler: ", h.classesURIs);
+//				this.logger.info("Notifying secondary type handler: ", h.classesURIs);
 			}
 			h.callback(msgRL);
 			c++;
@@ -489,7 +494,7 @@ HaleyAPIVitalServiceImpl.prototype._streamHandler = function(msgRL) {
 	if(this.defaultHandler != null) {
 		
 		if(this.logEnabled) {
-			//console.log("Notifying default handler");
+//			this.logger.info("Notifying default handler");
 		}
 		
 		this.defaultHandler(msgRL);
@@ -499,7 +504,7 @@ HaleyAPIVitalServiceImpl.prototype._streamHandler = function(msgRL) {
 	
 	
 	if(this.logEnabled) {
-		console.log("Notified " + c + " msg handlers");
+		this.logger.info("Notified " + c + " msg handlers");
 	}
 	
 	//notify handlers if found
@@ -507,12 +512,14 @@ HaleyAPIVitalServiceImpl.prototype._streamHandler = function(msgRL) {
 
 HaleyAPIVitalServiceImpl.prototype._sendLoggedInMsg = function(callback) {
 	
+	var _this = this;
+	
 	var msg = vitaljs.graphObject({type: 'http://vital.ai/ontology/vital-aimp#UserLoggedIn'});
 	
 	this.sendMessage(this.haleySessionSingleton, msg, [], function(error){
 		
 		if(error) {
-			console.error("Error when sending loggedin message: ", error);
+			_this.logger.error("Error when sending loggedin message: ", error);
 			callback(error);
 		} else {
 			callback(null);
@@ -603,7 +610,8 @@ HaleyAPIVitalServiceImpl.prototype.listChannels = function(haleySession, callbac
 	this.sendMessage(this.haleySessionSingleton, msg, [], function(error){
 		
 		if(error) {
-			console.error("Error when sending list channel request message: ", error);
+			
+			_this.logger.error("Error when sending list channel request message: ", error);
 			
 			callback(error);
 			
@@ -623,7 +631,7 @@ HaleyAPIVitalServiceImpl.prototype.openSession = function(callback) {
 	}
 	
 	if(this.logEnabled) {
-		console.log('subscribing to stream ', this.streamName);
+		this.logger.info('subscribing to stream ', this.streamName);
 	}
 	
 	var _this = this;
@@ -636,13 +644,13 @@ HaleyAPIVitalServiceImpl.prototype.openSession = function(callback) {
 	this.vitalService.callFunction(VitalService.JS_REGISTER_STREAM_HANDLER, {streamName: this.streamName, handlerFunction: this.handlerFunction}, function(succsessObj){
 		
 		if(_this.logEnabled) {
-			console.log('registered handler to ' + _this.streamName, succsessObj);
+			_this.logger.info('registered handler to ' + _this.streamName, succsessObj);
 		}
 		
 		_this.vitalService.callFunction(VitalService.VERTX_STREAM_SUBSCRIBE, {streamName: _this.streamName}, function(succsessObj){
 			
 			if(_this.logEnabled) {
-				console.log("subscribed to stream " + _this.streamName, succsessObj); 
+				_this.logger.info("subscribed to stream " + _this.streamName, succsessObj); 
 			}
 			
 			//session opened
@@ -653,7 +661,7 @@ HaleyAPIVitalServiceImpl.prototype.openSession = function(callback) {
 				_this._sendLoggedInMsg(function(error){
 					
 					if(_this.logEnabled) {
-						console.log("LoggedIn msg sent successfully");
+						_this.logger.info("LoggedIn msg sent successfully");
 					}
 					
 					if(error) {
@@ -674,7 +682,7 @@ HaleyAPIVitalServiceImpl.prototype.openSession = function(callback) {
 			
 		}, function(errorObj) {
 			
-			console.error("Error when subscribing to stream", errorObj);
+			_this.logger.error("Error when subscribing to stream", errorObj);
 			
 			callback(errorObj);
 			
@@ -683,7 +691,7 @@ HaleyAPIVitalServiceImpl.prototype.openSession = function(callback) {
 		
 	}, function(error){
 
-		console.error('couldn\'t register messages handler', error);
+		_this.logger.error('couldn\'t register messages handler', error);
 		
 		callback(error);
 		
@@ -705,7 +713,7 @@ HaleyAPIVitalServiceImpl.prototype.registerCallback = function(haleySession, cla
 	for( var i = 0 ; i < this.handlers.length; i++ ) {
 		
 		if( this.handlers[i].callback == callback ) {
-			console.warn("handler already registered ", callback);
+			this.logger.warn("handler already registered ", callback);
 			return false;
 		}
 	}
@@ -833,13 +841,13 @@ HaleyAPIVitalServiceImpl.prototype.sendMessage = function(haleySession, aimpMess
 		//ok
 		graphObjectsList = graphObjectsListOrCallback;
 	} else {
-		console.error("expected 3 or 4 arguments");
+		this.logger.error("expected 3 or 4 arguments");
 		callback("expected 3 or 4 arguments");
 		return;
 	}
 	
 	if(typeof(callback) !== 'function') {
-		console.error("callback param must be a function");
+		this.logger.error("callback param must be a function");
 		callback("callback param must be a function");
 		return;
 	}
@@ -991,7 +999,7 @@ HaleyAPIVitalServiceImpl.prototype.sendMessageImpl = function(haleySession, aimp
 	this.vitalService.callFunction(method, {message: rl}, function(successRL){
 		
 		if(_this.logEnabled) {
-			console.log("message sent successfully", successRL);
+			_this.logger.info("message sent successfully", successRL);
 		}
 		
 		if(updateTimestamp) {
@@ -1007,7 +1015,7 @@ HaleyAPIVitalServiceImpl.prototype.sendMessageImpl = function(haleySession, aimp
 		
 	}, function(error){
 		
-		console.error("error when sending message: " + error);
+		_this.logger.error("error when sending message: " + error);
 		
 		if( retryCount == 0 && error && error.indexOf('error_denied') == 0) {
 			
@@ -1015,7 +1023,7 @@ HaleyAPIVitalServiceImpl.prototype.sendMessageImpl = function(haleySession, aimp
 			
 			if(cachedCredentials != null) {
 				
-				if(_this.logEnabled) console.log("Session not found, re-authenticating...");
+				if(_this.logEnabled) _this.logger.info("Session not found, re-authenticating...");
 				
 				//this info updated in vitalservice instance
 //				haleySession.authAccount = null
@@ -1026,12 +1034,12 @@ HaleyAPIVitalServiceImpl.prototype.sendMessageImpl = function(haleySession, aimp
 				_this.authenticateSession(haleySession, cachedCredentials.username, cachedCredentials.password, function(authError, login){
 			
 					if(! authError ) {
-						if(_this.logEnabled) console.log("Successfully reauthenticated the session, sending the message");
+						if(_this.logEnabled) _this.logger.info("Successfully reauthenticated the session, sending the message");
 						_this.sendMessageImpl(haleySession, aimpMessage, graphObjectsList, retryCount + 1, callback);
 						
 					} else {
 						
-						console.error("Reauthentication attempt failed: ", authError);
+						_this.logger.error("Reauthentication attempt failed: ", authError);
 						
 						callback(error);
 						
@@ -1089,7 +1097,7 @@ HaleyAPIVitalServiceImpl.prototype.unauthenticateSession = function(haleySession
 	
 	this.sendMessage(haleySession, msg, [], function(error){
 		if(error) {
-			console.error("Error when sending logged out msg");
+			_this.logger.error("Error when sending logged out msg");
 			callback(error);
 			return;
 		}
@@ -1097,14 +1105,14 @@ HaleyAPIVitalServiceImpl.prototype.unauthenticateSession = function(haleySession
 		_this.vitalService.callFunction(VitalServiceWebsocketImpl.vitalauth_logout, {}, function(logoutSuccess){
 			
 			if(_this.logEnabled) {
-				console.log("Logout function success", logoutSuccess);
+				_this.logger.info("Logout function success", logoutSuccess);
 			}
 			
 			callback();
 			
 		}, function(logoutError) {
 			
-			console.error("Logout function error", logoutError);
+			_this.logger.error("Logout function error", logoutError);
 			
 			callback(logoutError);
 			
@@ -1127,12 +1135,12 @@ HaleyAPIVitalServiceImpl.prototype.addReconnectListener = function(reconnectList
 
 
 	if(this.reconnectListeners.indexOf(reconnectListener) >= 0) {
-		if(this.logEnabled) console.log("Reconnect listner already added");
+		if(this.logEnabled) this.logger.info("Reconnect listner already added");
 		return false;
 		
 	} else {
 		
-		if(this.logEnabled) console.log("New reconnect listener added");
+		if(this.logEnabled) this.logger.info("New reconnect listener added");
 		
 		this.reconnectListeners.push(reconnectListener);
 		
@@ -1159,7 +1167,9 @@ HaleyAPIVitalServiceImpl.prototype.removeReconnectListener = function(reconnectL
 
 HaleyAPIVitalServiceImpl.prototype._listServerDomainModelsJQueryImpl = function(callback) {
 	
-	console.log("Getting server domains list from saas server");
+	var _this = this;
+	
+	this.logger.info("Getting server domains list from saas server");
 
 	if(typeof(document) === 'undefined') {
 		callback("No document object - client side listServerDomainModels not available");
@@ -1180,7 +1190,8 @@ HaleyAPIVitalServiceImpl.prototype._listServerDomainModelsJQueryImpl = function(
 	var jqxhr = $.ajax( { method: 'GET', url: domainsURL, cache: false} )
 	.done(function(body) {
 		try {
-			console.log("domains objects", body);
+			_listServerDomainModelsJQueryImpl(t)
+			_this.logger.info("domains objects", body);
 			var parsed = body;
    			var domainsList = [];
    			for(var i = 0 ; i < parsed.length; i++) {
@@ -1194,7 +1205,7 @@ HaleyAPIVitalServiceImpl.prototype._listServerDomainModelsJQueryImpl = function(
    			callback("error when parsing domains json: " + e, null);
    		}
 	}).fail(function(jqXHR, textStatus) {
-		console.error("domains check failed: " + textStatus);
+		_this.logger.error("domains check failed: " + textStatus);
     	callback(textStatus, null);
 	});
 		
@@ -1202,7 +1213,9 @@ HaleyAPIVitalServiceImpl.prototype._listServerDomainModelsJQueryImpl = function(
 
 HaleyAPIVitalServiceImpl.prototype.listServerDomainModels = function(callback) {
 
-	console.log("Getting server domains list");
+	var _this = this;
+	
+	this.logger.info("Getting server domains list");
 	
 	if(typeof(module) === 'undefined') {
 //		callback("No module object - listServerDomainModels is only available in nodejs context");
@@ -1228,12 +1241,13 @@ HaleyAPIVitalServiceImpl.prototype.listServerDomainModels = function(callback) {
 	    method: 'GET'
 	}, function(error, response, body){
 	    if(error) {
-	    	console.error("Error when getting user profile data", error);
+	    	_this.logger.error("Error when getting user profile data", error);
 	    	callback(error, null);
 	    } else {
 	    	if(response.statusCode == 200) {
 	    		
-	    		console.log(response.statusCode, ( body && body.length > 100 ) ? ( body.substring(0, 97) + "...") : body);
+	    		_this.logger.info(response.statusCode, ( body && body.length > 100 ) ? ( body.substring(0, 97) + "...") : body);
+	    		
 	    		try {
 	    			
 	    			var parsed = JSON.parse(body);
@@ -1249,7 +1263,7 @@ HaleyAPIVitalServiceImpl.prototype.listServerDomainModels = function(callback) {
 	    			callback("error when parsing domains json: " + e, null);
 	    		}
 	    	} else {
-	    		console.error("Error when getting domains data " + response.statusCode, body);
+	    		_this.logger.error("Error when getting domains data " + response.statusCode, body);
 	    	}
 	    }
 	});
@@ -1347,7 +1361,7 @@ HaleyAPIVitalServiceImpl.prototype._uploadFileImpl = function(isBrowser, haleySe
 //    
     
     
-    console.log('upload URL: ' + url);
+    this.logger.info('upload URL: ' + url);
     
     //old way
 	var onFileNodeURI = function(fileNodeURI, newFileNode){
@@ -1371,7 +1385,7 @@ HaleyAPIVitalServiceImpl.prototype._uploadFileImpl = function(isBrowser, haleySe
 				
 				var errMsg = "Error when sending file answer: " + error;
 				
-				console.error(errMsg);
+				_this.logger.error(errMsg);
 				
 				callback(errMsg);
 				
@@ -1391,8 +1405,7 @@ HaleyAPIVitalServiceImpl.prototype._uploadFileImpl = function(isBrowser, haleySe
 	
 	var onFileDataResponse = function(data) {
 	
-		console.log('file data received: ', data);
-		
+		_this.logger.info('file data received: ', data);
 	
 		var am = vitaljs.graphObject({type: 'http://vital.ai/ontology/vital-aimp#AnswerMessage'});
 		am.URI = _this._randomURI();
@@ -1418,13 +1431,13 @@ HaleyAPIVitalServiceImpl.prototype._uploadFileImpl = function(isBrowser, haleySe
 				
 				var errMsg = "Error when sending file answer: " + error;
 				
-				console.error(errMsg);
+				_this.logger.error(errMsg);
 				
 //				callback(errMsg);
 				
 			} else {
 				
-				console.log('file upload answer sent');
+				_this.logger.info('file upload answer sent');
 				//answer accepted
 //				callback(null, newFileNode);
 				
@@ -1434,7 +1447,7 @@ HaleyAPIVitalServiceImpl.prototype._uploadFileImpl = function(isBrowser, haleySe
 			
 			var msg = msgRL.first();
 			
-			console.log('file upload response:', msg);
+			_this.logger.info('file upload response:', msg);
 			
 			if(msg.type != 'http://vital.ai/ontology/vital-aimp#MetaQLResultsMessage') {
 				return true;
@@ -1477,7 +1490,7 @@ HaleyAPIVitalServiceImpl.prototype._uploadFileImpl = function(isBrowser, haleySe
 		fd.append('upload_file', fileObject.file);
 		
 	    var xhr = new XMLHttpRequest();
-		console.log('default timeout: ', xhr.timeout);
+	    _this.logger.info('default timeout: ', xhr.timeout);
 		
 		xhr.open("POST", url, true);
 		xhr.onreadystatechange = function() {
@@ -1562,12 +1575,12 @@ HaleyAPIVitalServiceImpl.prototype._uploadFileImpl = function(isBrowser, haleySe
 		var formData = {};
 		
 		try {
-			console.log("uploading file from location: " + fileObject.filePath);
+			_this.logger.info("uploading file from location: " + fileObject.filePath);
 			var rs = fs.createReadStream(fileObject.filePath);
-			console.log("readstream", rs);
+			_this.logger.info("readstream", rs);
 			formData['upload_file'] = rs;
 		} catch(e) {
-			console.error("error when starting upload: ", e);
+			_this.logger.error("error when starting upload: ", e);
 			callback("error when starting upload: " + e.message);
 			return;
 		}
@@ -1575,11 +1588,12 @@ HaleyAPIVitalServiceImpl.prototype._uploadFileImpl = function(isBrowser, haleySe
 		var req = request.post({url:url, formData: formData}, function (err, resp, body) {
 		  
 			if (err) {
-				console.error(err);
+				_this.logger.error(err);
 				callback("Error when uploading file: " + err);
 				return;
 			}
-			console.log('Server response: ' + body);
+			
+			_this.logger.info('Server response: ' + body);
 			
 			var fileData = null;
 			
@@ -1630,7 +1644,7 @@ HaleyAPIVitalServiceImpl.prototype._uploadFileImpl = function(isBrowser, haleySe
 
 HaleyAPIVitalServiceImpl.prototype.cancelFileUpload = function(haleySession, fileQuestionMessage, callback) {
 
-	
+	var _this = this;
 	
 	var questionMessage = fileQuestionMessage[0];
 	
@@ -1654,7 +1668,7 @@ HaleyAPIVitalServiceImpl.prototype.cancelFileUpload = function(haleySession, fil
 			
 			var errMsg = "Error when sending file answer skip: " + error;
 			
-			console.error(errMsg);
+			_this.logger.error(errMsg);
 			
 			callback(errMsg);
 			

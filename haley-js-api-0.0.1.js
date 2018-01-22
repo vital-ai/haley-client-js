@@ -46,8 +46,10 @@ HaleySession.prototype.getAuthAccount = function() {
  * @param syncdomains
  * @returns
  */
-HaleyAPI = function(implementation, syncdomains, callback) {
+HaleyAPI = function(implementation, syncdomains, callback, logger) {
+	this.logger = logger != null ? logger : console;
 	this.impl = implementation;
+	this.impl.logger = this.logger;
 	if(syncdomains) {
 		throw "syncdomains not supported yet";
 	}
@@ -64,6 +66,15 @@ HaleyAPI = function(implementation, syncdomains, callback) {
 	});
 }
 
+HaleyAPI.prototype.setLogger = function(logger){
+	if(logger == null) throw new Error("logger cannot be null"); 
+	this.impl.logger = logger;
+	this.logger = logger;
+}
+
+HaleyAPI.prototype.getLogger = function() {
+	return this.logger;
+}
 
 /**
  * Authenticates haley session or throws exception if already authenticated or auth error occured
@@ -242,6 +253,8 @@ HaleyAPI.prototype.listServerDomainModels = function(callback) {
  */
 HaleyAPI.prototype.validateDomainModels = function(failIfListElementsDifferent, callback) {
 	
+	var _this = this;
+	
 	this.listServerDomainModels(function(error, models){
 		
 		try {
@@ -349,7 +362,7 @@ HaleyAPI.prototype.validateDomainModels = function(failIfListElementsDifferent, 
 			callback(null);
 			
 		} catch(e) {
-			console.error(e);
+			_this.logger.error(e);
 			callback("Internal error: " + e);
 		}
 		
