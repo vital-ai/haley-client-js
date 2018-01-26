@@ -379,7 +379,8 @@ HaleyAPI.prototype.validateDomainModels = function(failIfListElementsDifferent, 
  * 		file: <from file inputfile>,
  * 		accountURIs: <list of additional accountsURIs to be added to file node>,
  *      fileNodeClass: optional fileNodeClass, default: 'http://vital.ai/ontology/vital#FileNode',
- *      parentNodeURI: optional parent of the filenode, defaults to accountURI
+ *      parentNodeURI: optional parent of the filenode, defaults to accountURI,
+ *      progressListener: optional progress listener that is called with (loaded, total) bytes
  *  }
  *  selected in some form
  * @param callback (error, fileNode)
@@ -388,9 +389,27 @@ HaleyAPI.prototype.uploadFileInBrowser = function(haleySession, fileQuestionMess
 	this.impl.uploadFileInBrowser(haleySession, fileQuestionMessage, fileObject, callback);
 }
 
+/**
+ * Takes care of file upload in response to a File Question in cordova
+ * @param haleySession
+ * @param fileQuestionMessage [QuestionMessage, FileQuestion]
+ * @param fileObject, an object 
+ * 	{ 
+ * 		file: <from file inputfile>,
+ * 		accountURIs: <list of additional accountsURIs to be added to file node>,
+ *      fileNodeClass: optional fileNodeClass, default: 'http://vital.ai/ontology/vital#FileNode',
+ *      parentNodeURI: optional parent of the filenode, defaults to accountURI,
+ *      progressListener: optional progress listener that is called with (loaded, total) bytes
+ *  }
+ *  selected in some form
+ * @param callback (error, fileNode)
+ */
+HaleyAPI.prototype.uploadFileInCordova = function(haleySession, fileQuestionMessage, fileObject, callback) {
+	this.impl.uploadFileInCordova(haleySession, fileQuestionMessage, fileObject, callback);
+}
 
 /**
- * Uploads file in non-browser environment in response to a File Question
+ * Uploads file in non-browser (nodejs) environment in response to a File Question
  * @param haleySession
  * @param fileQuestionMessage [QuestionMessage, FileQuestion]
  * @param fileObject, an object 

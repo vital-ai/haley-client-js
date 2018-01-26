@@ -1190,7 +1190,6 @@ HaleyAPIVitalServiceImpl.prototype._listServerDomainModelsJQueryImpl = function(
 	var jqxhr = $.ajax( { method: 'GET', url: domainsURL, cache: false} )
 	.done(function(body) {
 		try {
-			_listServerDomainModelsJQueryImpl(t)
 			_this.logger.info("domains objects", body);
 			var parsed = body;
    			var domainsList = [];
@@ -1272,15 +1271,21 @@ HaleyAPIVitalServiceImpl.prototype.listServerDomainModels = function(callback) {
 
 
 HaleyAPIVitalServiceImpl.prototype.uploadFileInBrowser = function(haleySession, fileQuestionMessage, fileObject, callback) {
-	this._uploadFileImpl(true, haleySession, fileQuestionMessage, fileObject, callback);
+	this._uploadFileImpl(true, false, haleySession, fileQuestionMessage, fileObject, callback);
 }	
 HaleyAPIVitalServiceImpl.prototype.uploadFile = function(haleySession, fileQuestionMessage, fileObject, callback) {
-	this._uploadFileImpl(false, haleySession, fileQuestionMessage, fileObject, callback);
+	this._uploadFileImpl(false, false, haleySession, fileQuestionMessage, fileObject, callback);
 }
 
-HaleyAPIVitalServiceImpl.prototype._uploadFileImpl = function(isBrowser, haleySession, fileQuestionMessage, fileObject, callback) {	
+HaleyAPIVitalServiceImpl.prototype.uploadFileInCordova = function(haleySession, fileQuestionMessage, fileObject, callback) {
+	this._uploadFileImpl(false, true, haleySession, fileQuestionMessage, fileObject, callback);
+}
+
+HaleyAPIVitalServiceImpl.prototype._uploadFileImpl = function(isBrowser, isCordova, haleySession, fileQuestionMessage, fileObject, callback) {	
 	
 	var _this = this;
+	
+	var progressListener = fileObject.progressListener;
 	
 	if(isBrowser) {
 		
@@ -1290,6 +1295,8 @@ HaleyAPIVitalServiceImpl.prototype._uploadFileImpl = function(isBrowser, haleySe
 		}
 		
 	} else {
+		
+		//cordova and nodejs
 		
 		if( fileObject.filePath == null || fileObject.filePath.length == 0 ) {
 			callback("no 'filePath' string in  fileObject param");
@@ -1486,12 +1493,25 @@ HaleyAPIVitalServiceImpl.prototype._uploadFileImpl = function(isBrowser, haleySe
 	
 	if(isBrowser) {
 		
-		var fd = new FormData();
-		fd.append('upload_file', fileObject.file);
-		
 	    var xhr = new XMLHttpRequest();
 	    _this.logger.info('default timeout: ', xhr.timeout);
 		
+	    var multipart = true;
+	    
+		// progress bar
+	    if(xhr.upload && progressListener != null) {
+	    	xhr.upload.addEventListener("progress", function(e) {
+	    		progressListener(e.loaded, e.total);
+//	    		var pc = parseInt(100 - (e.loaded / e.total * 100));
+//	    		progress.style.backgroundPosition = pc + "% 0";
+	    	}, false);
+	    	
+	    	multipart = false;
+	    	
+	    	url += '&multipart=false&fileName=' + encodeURIComponent(fileObject.file.name);
+	    	
+	    }
+	    
 		xhr.open("POST", url, true);
 		xhr.onreadystatechange = function() {
 			
@@ -1564,7 +1584,115 @@ HaleyAPIVitalServiceImpl.prototype._uploadFileImpl = function(isBrowser, haleySe
 
 		};
 
-		xhr.send(fd);
+		if(multipart) {
+			
+			var fd = new FormData();
+			fd.append('upload_file', fileObject.file);
+			xhr.send(fd);
+			
+		} else {
+			
+			xhr.send(fileObject.file);
+			
+		}
+		
+	} else if(isCordova) {
+		
+		if(typeof( window.FileTransfer ) === 'undefined') {
+			
+			callback('No FileTransfer class - cordova-plugin-file-transfer may not be installed', null);
+			return;
+			
+		}
+		
+		
+		function win(r) {
+			
+			var body = r.response;
+		    console.log("FileUpload Code: " + r.responseCode);
+		    console.log("FileUpload Response: " + body);
+		    console.log("FileUpload BytesSent: " + r.bytesSent);
+		    
+		    var error = null;
+			
+			try {
+				
+				r = JSON.parse(body);
+				
+				if(r.error) {
+					error = r.error
+				} else {
+					
+					if(r.temporary == true) {
+						
+						fileData = r;
+						
+					} else {
+						
+						error = 'only temporary response accepted';
+						
+					}
+					
+				}
+				
+			} catch(e) {
+				
+				error = 'response error: ' + e.message;
+				
+			}
+			
+			if(error) {
+				
+				callback(error);
+
+			} else {
+				
+				onFileDataResponse(fileData);
+				
+			}
+		    
+		}
+
+		function fail(error) {
+/*
+ * 1 = FileTransferError.FILE_NOT_FOUND_ERR
+2 = FileTransferError.INVALID_URL_ERR
+3 = FileTransferError.CONNECTION_ERR
+4 = FileTransferError.ABORT_ERR
+5 = FileTransferError.NOT_MODIFIED_ERR
+ */
+			console.error("file upload error", error);
+			
+			var errorMsg = "Error occurred: Code = " + error.code + ' HTTP status: ' + error.http_status + ' body ' + error.body;
+
+			callback(errorMsg, null);
+			
+		}
+
+		var fileURL = fileObject.filePath;
+		
+		var options = new FileUploadOptions();
+		options.fileKey="upload_file";
+		options.fileName=fileURL.substr(fileURL.lastIndexOf('/')+1);
+		//TODO MIME TYPE
+//		options.mimeType="text/plain";
+
+//		var headers={'headerParam':'headerValue'};
+//		options.headers = headers;
+
+		var ft = new FileTransfer();
+		if(progressListener != null) {
+			ft.onprogress = function(progressEvent) {
+			    if (progressEvent.lengthComputable) {
+			    	progressListener(progressEvent.loaded, progressEvent.total);
+//			        loadingStatus.setPercentage(progressEvent.loaded / progressEvent.total);
+			    } else {
+//			        loadingStatus.increment();
+			    }
+			};
+		}
+		
+		ft.upload(fileURL, url, win, fail, options);
 		
 	} else {
 		
