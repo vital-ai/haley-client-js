@@ -83,6 +83,13 @@ HaleyAPI.prototype.authenticateSession = function(haleySession, username, passwo
 	this.impl.authenticateSession(haleySession, username, password, callback);
 }
 
+/**
+ * Authenticates haley session or throws exception if already authenticated or auth error occured
+ */
+HaleyAPI.prototype.authenticateSessionWithAccountID = function(haleySession, username, password, accountID, callback) {
+	this.impl.authenticateSessionWithAccountID(haleySession, username, password, accountID, callback);
+}
+
 
 HaleyAPI.prototype.close = function(callback) {
 	this.impl.close(callback);

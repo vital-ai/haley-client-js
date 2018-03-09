@@ -158,6 +158,9 @@ HaleyAPIVitalServiceImpl.prototype.getAuthAccount = function(haleySession) {
 
 
 HaleyAPIVitalServiceImpl.prototype.authenticateSession = function(haleySession, username, password, callback) {
+	this.authenticateSessionWithAccountID(haleySession, username, password, null, callback);
+}
+HaleyAPIVitalServiceImpl.prototype.authenticateSessionWithAccountID = function(haleySession, username, password, accountID, callback) {
 	
 	var e = this._checkSession(haleySession);
 	if(e) {
@@ -172,7 +175,7 @@ HaleyAPIVitalServiceImpl.prototype.authenticateSession = function(haleySession, 
 	
 	var _this = this;
 	
-	this.vitalService.callFunction(VitalServiceWebsocketImpl.vitalauth_login, {loginType: 'Login', username: username, password: password}, function(loginSuccess){
+	this.vitalService.callFunction(VitalServiceWebsocketImpl.vitalauth_login, {loginType: 'Login', username: username, password: password, accountID: accountID}, function(loginSuccess){
 			
 		if(_this.logEnabled) {
 			_this.logger.info("auth success: ", loginSuccess);
@@ -181,7 +184,7 @@ HaleyAPIVitalServiceImpl.prototype.authenticateSession = function(haleySession, 
 		var sessionID = haleySession.getSessionID();
 
 		//credentials caching not supported yet
-//		_this.cachedCredentials[sessionID] = {username: username, password: password};
+//		_this.cachedCredentials[sessionID] = {username: username, password: password, accountID: accountID};
 		
 		_this._sendLoggedInMsg(function(error){
 
@@ -1031,7 +1034,7 @@ HaleyAPIVitalServiceImpl.prototype.sendMessageImpl = function(haleySession, aimp
 //				haleySession.authSessionID = null
 //				vitalService.appSessionID = null
 				
-				_this.authenticateSession(haleySession, cachedCredentials.username, cachedCredentials.password, function(authError, login){
+				_this.authenticateSessionWithAccountID(haleySession, cachedCredentials.username, cachedCredentials.password, cachedCredentials.accountID, function(authError, login){
 			
 					if(! authError ) {
 						if(_this.logEnabled) _this.logger.info("Successfully reauthenticated the session, sending the message");
