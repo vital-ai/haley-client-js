@@ -476,6 +476,17 @@ HaleyAPI.prototype.removeAIMPMessageSentListener = function(listener) {
 } 
 
 
+/**
+ * False by default. When enabled the client attempts to re-authenticate if current session was expired/not found.
+ */
+HaleyAPI.prototype.setCredentialsCacheEnabled = function(enabled) {
+	this.impl.credentialsCacheEnabled = enabled;
+}
+
+HaleyAPI.prototype.isCredentialsCacheEnabled = function() {
+	return this.impl.credentialsCacheEnabled;
+}
+
 //nodejs specific
 if(typeof(module) !== 'undefined') {
 //	module.exports = {

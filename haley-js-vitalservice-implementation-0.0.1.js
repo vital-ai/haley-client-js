@@ -45,6 +45,7 @@ HaleyAPIVitalServiceImpl = function(vitalService) {
 	//this timestamp is updated when a new non-hearbeat or non-loggedin/out message is sent
 	this.lastActivityTimestamp = null; 
 	
+	this.credentialsCacheEnabled = false;
 	this.cachedCredentials = {};
 	
 	
@@ -183,8 +184,9 @@ HaleyAPIVitalServiceImpl.prototype.authenticateSessionWithAccountID = function(h
 
 		var sessionID = haleySession.getSessionID();
 
-		//credentials caching not supported yet
-//		_this.cachedCredentials[sessionID] = {username: username, password: password, accountID: accountID};
+		if(_this.credentialsCacheEnabled) {
+			_this.cachedCredentials[sessionID] = {username: username, password: password, accountID: accountID};
+		}
 		
 		_this._sendLoggedInMsg(function(error){
 
@@ -1020,13 +1022,16 @@ HaleyAPIVitalServiceImpl.prototype.sendMessageImpl = function(haleySession, aimp
 		
 		_this.logger.error("error when sending message: " + error);
 		
-		if( retryCount == 0 && error && error.indexOf('error_denied') == 0) {
+		if( retryCount == 0 && error && ( 
+				error.indexOf('error_denied') == 0 
+				|| error.indexOf('Session not found') >= 0
+		)) {
 			
-			var cachedCredentials = _this.cachedCredentials[sessionID];
+			var cachedCredentials = _this.credentialsCacheEnabled == true ? _this.cachedCredentials[sessionID] : null; 
 			
 			if(cachedCredentials != null) {
 				
-				if(_this.logEnabled) _this.logger.info("Session not found, re-authenticating...");
+				_this.logger.info("Session not found, re-authenticating...");
 				
 				//this info updated in vitalservice instance
 //				haleySession.authAccount = null
@@ -1037,7 +1042,7 @@ HaleyAPIVitalServiceImpl.prototype.sendMessageImpl = function(haleySession, aimp
 				_this.authenticateSessionWithAccountID(haleySession, cachedCredentials.username, cachedCredentials.password, cachedCredentials.accountID, function(authError, login){
 			
 					if(! authError ) {
-						if(_this.logEnabled) _this.logger.info("Successfully reauthenticated the session, sending the message");
+						_this.logger.info("Successfully reauthenticated the session, sending the message");
 						_this.sendMessageImpl(haleySession, aimpMessage, graphObjectsList, retryCount + 1, callback);
 						
 					} else {
