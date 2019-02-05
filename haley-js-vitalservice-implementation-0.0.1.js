@@ -982,6 +982,7 @@ HaleyAPIVitalServiceImpl.prototype.sendMessageImpl = function(haleySession, aimp
 	} else {
 		if(sid != sessionID) {
 			callback('auth sessionID ' + sessionID + " does not match one set in message: " + sid);
+			return;
 		}
 	}
 	
@@ -990,7 +991,16 @@ HaleyAPIVitalServiceImpl.prototype.sendMessageImpl = function(haleySession, aimp
 	
 	if(graphObjectsList != null) {
 		for(var i = 0 ; i < graphObjectsList.length; i++) {
-			rl.addResult(graphObjectsList[i]);
+			var graphObject = graphObjectsList[i];
+			if(graphObject == null) {
+				callback("payload object cannot be null, #" + (i+1));
+				return;
+			}
+			if(graphObject.URI == null) {
+				callback("all payload objects must have URIs set, missing URI in object #" + (i+1) + " type: " + graphObject.type);
+				return;
+			}
+			rl.addResult(graphObject);
 		}
 	}
 	
